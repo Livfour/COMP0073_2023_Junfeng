@@ -14,7 +14,9 @@ from models.backbone.vit import ViTEncoder
 from models.backbone.video_vit import VideoViTEncoder
 from models.backbone.vit_with_fusion import FusionVit
 from models.head.LMSFI import LMSFI
-from models.head import DeconvHead, MaskHead, ResMaskHead
+from models.head import DeconvHead, MaskHead, ResMaskHead, SimpleHead
+from models.head.ResMaskHeadv2 import ResMaskHead2
+from models.head.MaskHead2 import MaskHead2
 from loss import JointsMSELoss
 from utilities.utilities import keypoints_to_mask
 from mmpose.evaluation import pose_pck_accuracy
@@ -84,7 +86,7 @@ def train(
             optim.zero_grad()
             videos = videos.to(device)
             heatmaps = heatmaps.to(device)
-            pred = model(videos, heatmaps)
+            pred = model(videos)
             loss = criterion(pred, heatmaps)
             if loss_train_ema is None:
                 loss_train_ema = loss.item()
@@ -152,12 +154,12 @@ def train(
 
 if __name__ == "__main__":
     logging.basicConfig(
-        filename="./runs/Fusion_ResMask_01.log", level=logging.INFO)
-    writer = SummaryWriter("./runs/Fusion_ResMask_01")
+        filename="./runs/Fusion_Simple_01.log", level=logging.INFO)
+    writer = SummaryWriter("./runs/Fusion_Simple_01")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_name = torch.cuda.get_device_name(0)
-    model_path = "./checkpoints/Fusion_ResMask_01.pth"
-    best_model_path = "./checkpoints/Fusion_ResMask_01_Best.pth"
+    model_path = "./checkpoints/Fusion_Simple_01.pth"
+    best_model_path = "./checkpoints/Fusion_Simple_01_Best.pth"
     pretrained_path = "./checkpoints/vitpose_base_coco_aic_mpii.pth"
     dataset_root_dir = "/home/junfeng/datasets/PoseTrack21"
 
@@ -173,7 +175,7 @@ if __name__ == "__main__":
 
     dataloader_train = DataLoader(
         dataset_train,
-        batch_size=48,
+        batch_size=64,
         shuffle=True,
         drop_last=True,
         num_workers=16,
@@ -182,12 +184,15 @@ if __name__ == "__main__":
 
     encoder = FusionVit(pretrained_path=pretrained_path)
     neck = nn.Identity()
-    head = ResMaskHead(pretrained_path=pretrained_path)
+    # head = ResMaskHead(pretrained_path=pretrained_path)
+    # head = DeconvHead(pretrained_path=pretrained_path)
+    # head = MaskHead2(pretrained_path=pretrained_path)
+    head = SimpleHead()
     model = PoseEstimate(encoder=encoder, neck=neck, head=head)
     model.to(device)
 
     total_epochs = 10000
-    lr = 5e-4
+    lr = 1e-5
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = JointsMSELoss(use_target_weight=True, device=device)
     print(f"Start training on {device_name}")

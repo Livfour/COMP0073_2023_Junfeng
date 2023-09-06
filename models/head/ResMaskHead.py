@@ -167,7 +167,7 @@ class ResMaskHead(BaseHead):
                            device=f.device).repeat(B, 1)
         return self.forward(f, h, _ts)
 
-    def denoise(self, f, heatmaps):
+    def denoise(self, f, heatmaps, t=100):
         B = f.shape[0]
-        _ts = torch.tensor(1, device=f.device).repeat(B, 1)
+        _ts = torch.tensor(t, device=f.device).repeat(B, 1)
         return self.forward(f, heatmaps, _ts)

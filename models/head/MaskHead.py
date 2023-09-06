@@ -105,17 +105,18 @@ class MaskHead(BaseHead):
         out = self.final_conv(out)
         return out
 
-    def predict(self, f):
+    def predict(self, f, n=1):
         """
         f: (B, embed_dim, num_patches_height, num_patches_width)
         """
 
-        B = f.shape[0]
+        B = n
+        f = f.repeat(B, 1, 1, 1)
         h = torch.randn(B, self.num_keypoints, self.H_heatmap, self.W_heatmap).to(
             f.device)
         _ts = torch.tensor(self.num_timesteps-1,
                            device=f.device).repeat(B, 1)
-        return self.forward(f, h, _ts)
+        return torch.mean(self.forward(f, h, _ts), dim=0, keepdim=True)
 
     def denoise(self, f, heatmaps):
         B = f.shape[0]

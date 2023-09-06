@@ -14,8 +14,10 @@ class PoseEstimate(nn.Module):
 
         if self.is_diffusion:
             self.forward = self.forward_diffusion
+            self.predict = self.predict_diffusion
         else:
             self.forward = self.forward_normal
+            self.predict = self.predict_normal
     
     def forward_normal(self, x):
         x = self.encoder(x)
@@ -29,16 +31,22 @@ class PoseEstimate(nn.Module):
         x = self.head(x, h)
         return x
 
-    def predict(self, x):
+    def predict_normal(self, x):
         x = self.encoder(x)
         x = self.neck(x)
         x = self.head.predict(x)
         return x
-    
-    def denoise(self, x, h):
+
+    def predict_diffusion(self, x, n=1):
         x = self.encoder(x)
         x = self.neck(x)
-        x = self.head.denoise(x, h)
+        x = self.head.predict(x, n=n)
+        return x
+    
+    def denoise(self, x, h, t=100):
+        x = self.encoder(x)
+        x = self.neck(x)
+        x = self.head.denoise(x, h, t=t)
         return x
 
 
