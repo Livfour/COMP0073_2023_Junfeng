@@ -378,110 +378,37 @@ def keypoints_to_visible(keypoints):
     return visible
 
 
-def get_max_preds(batch_heatmaps):
-    '''
-    get predictions from score maps
-    heatmaps: numpy.ndarray([batch_size, num_joints, height, width])
-    '''
-    assert isinstance(batch_heatmaps, np.ndarray), \
-        'batch_heatmaps should be numpy.ndarray'
-    assert batch_heatmaps.ndim == 4, 'batch_images should be 4-ndim'
+def normalize_heatmaps(heatmaps):
+    """
+    Normalizes heatmaps to the range [0, 1].
 
-    batch_size = batch_heatmaps.shape[0]
-    num_joints = batch_heatmaps.shape[1]
-    width = batch_heatmaps.shape[3]
-    heatmaps_reshaped = batch_heatmaps.reshape((batch_size, num_joints, -1))
-    idx = np.argmax(heatmaps_reshaped, 2)
-    maxvals = np.amax(heatmaps_reshaped, 2)
+    Parameters:
+    - heatmaps: torch.Tensor of shape (num_joints, height, width)
+                17 * 64 * 48 in your case.
 
-    maxvals = maxvals.reshape((batch_size, num_joints, 1))
-    idx = idx.reshape((batch_size, num_joints, 1))
+    Returns:
+    - normalized_heatmaps: torch.Tensor of shape (num_joints, height, width)
+    """
+    num_joints, height, width = heatmaps.shape
+    normalized_heatmaps = torch.zeros_like(heatmaps, dtype=torch.float32)
 
-    preds = np.tile(idx, (1, 1, 2)).astype(np.float32)
+    for i in range(num_joints):
+        min_val = torch.min(heatmaps[i])
+        max_val = torch.max(heatmaps[i])
 
-    preds[:, :, 0] = (preds[:, :, 0]) % width
-    preds[:, :, 1] = np.floor((preds[:, :, 1]) / width)
+        if max_val != min_val:
+            normalized_heatmaps[i] = (heatmaps[i] - min_val) / (max_val - min_val)
 
-    pred_mask = np.tile(np.greater(maxvals, 0.0), (1, 1, 2))
-    pred_mask = pred_mask.astype(np.float32)
+    return normalized_heatmaps
 
-    preds *= pred_mask
-    return preds, maxvals
+def ReLu(x):
+    return np.maximum(x, 0)
 
-
-def calc_dists(preds, target, normalize):
-    preds = preds.astype(np.float32)
-    target = target.astype(np.float32)
-    dists = np.zeros((preds.shape[1], preds.shape[0]))
-    for n in range(preds.shape[0]):  # batch num
-        for c in range(preds.shape[1]):  # keypoint type
-            if target[n, c, 0] > 1 and target[n, c, 1] > 1:
-                normed_preds = preds[n, c, :] / normalize[n]
-                normed_targets = target[n, c, :] / normalize[n]
-                dists[c, n] = np.linalg.norm(
-                    normed_preds - normed_targets)  # Euclidean distance
-            else:
-                dists[c, n] = -1
-    return dists
-
-
-def dist_acc(dists, thr=0.5, percentage=True):
-    ''' Return percentage below threshold while ignoring values with a -1 '''
-    dist_cal = np.not_equal(dists, -1)
-    num_dist_cal = dist_cal.sum()
-    if num_dist_cal > 0:
-        less_thr_count = np.less(dists[dist_cal], thr).sum() * 1.0
-        if percentage:
-            return less_thr_count / num_dist_cal
-        else:
-            # less_thr_count = match  / num_dist_cal （val）
-            return less_thr_count, num_dist_cal
+def count_positive(x):
+    if x < 0:
+        return 0
     else:
-        if percentage:
-            return -1
-        else:
-            return -1, -1
-
-
-def accuracy(pred_heatmaps, target_keypoints, hm_type='udp_heatmaps', thr=0.5, image_size=(256, 192)):
-    '''
-    Calculate accuracy according to PCK (),
-    but uses ground truth heatmap rather than x,y locations
-    First value to be returned is average accuracy across 'idxs',
-    followed by individual accuracies
-    '''
-    idx = list(range(17))
-    image_height, image_width = image_size
-    heatmaps_height = 64
-    heatmaps_width = 48
-    norm = 1.0
-    if hm_type == 'gaussian':
-        pred, _ = get_max_preds(pred_heatmaps)
-        target = target_keypoints
-    elif hm_type == 'udp_heatmaps':
-        decoder = UDPHeatmap(input_size=image_size, heatmap_size=(
-            heatmaps_width, heatmaps_height))
-        pred = decoder.decode(pred_heatmaps)[0]
-        pred[np.isnan(pred)] = .0
-        target = target_keypoints[:, :2].reshape(-1, 17, 2)
-    print(pred)
-    print(target)
-    norm = np.ones((pred.shape[0], 2)) * np.array([heatmaps_height, heatmaps_width]) / 10
-    # use a fixed length as a measure rather than the length of body parts
-    dists = calc_dists(pred, target, norm)
-
-    acc = np.zeros((len(idx) + 1))
-    avg_acc = 0
-    cnt = 0
-
-    for i in range(len(idx)):
-        acc[i + 1] = dist_acc(dists[idx[i]], thr)
-        if acc[i + 1] >= 0:
-            avg_acc = avg_acc + acc[i + 1]
-            cnt += 1
-
-    avg_acc = avg_acc / cnt if cnt != 0 else 0
-    if cnt != 0:
-        acc[0] = avg_acc
-
-    return acc, avg_acc, cnt
+        return 1
+    
+def get_mean_average_acc(TP, P):
+    return sum(TP) / sum(P)

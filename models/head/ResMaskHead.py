@@ -150,24 +150,26 @@ class ResMaskHead(BaseHead):
         f_t_3 = self.down4(f_t_3)
         f_t_2 = self.down2(f_t_2)
         f_t_1 = self.down1(f_t_1)
-        
+
         out = f_t_1 + f_t_2 + f_t_3
         out = self.final_conv(out)
         return out
 
-    def predict(self, f):
+    def predict(self, f, n=1):
         """
         f: (B, embed_dim, num_patches_height, num_patches_width)
         """
 
-        B = f.shape[0]
+        B = n
+        f = f.repeat(B, 1, 1, 1)
         h = torch.randn(B, self.num_keypoints, self.H_heatmap, self.W_heatmap).to(
             f.device)
         _ts = torch.tensor(self.num_timesteps-1,
                            device=f.device).repeat(B, 1)
-        return self.forward(f, h, _ts)
+        return torch.mean(self.forward(f, h, _ts), dim=0, keepdim=True)
 
-    def denoise(self, f, heatmaps, t=100):
-        B = f.shape[0]
+    def denoise(self, f, heatmaps, n=1, t=100):
+        B = n
+        f = f.repeat(B, 1, 1, 1)
         _ts = torch.tensor(t, device=f.device).repeat(B, 1)
-        return self.forward(f, heatmaps, _ts)
+        return torch.mean(self.forward(f, heatmaps, _ts), dim=0, keepdim=True)

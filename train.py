@@ -1,5 +1,4 @@
 import os
-import logging
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -10,6 +9,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from datasets.posetrack21 import PoseTrack21
 from models.PoseEstimate import PoseEstimate
+from models.backbone import ResNet50
 from models.backbone.vit import ViTEncoder
 from models.backbone.video_vit import VideoViTEncoder
 from models.backbone.vit_with_fusion import FusionVit
@@ -61,7 +61,7 @@ def train(
         last_loss = None
         best_AP = 0
     else:
-        model_dict = torch.load(model_path, map_location=device)
+        model_dict = torch.load(model_path, map_location="cpu")
         model.load_state_dict(model_dict["model_state_dict"])
         optim.load_state_dict(model_dict["optim"])
         lr_scheduler.load_state_dict(model_dict["lr_scheduler"])
@@ -86,7 +86,7 @@ def train(
             optim.zero_grad()
             videos = videos.to(device)
             heatmaps = heatmaps.to(device)
-            pred = model(videos)
+            pred = model(videos, heatmaps)
             loss = criterion(pred, heatmaps)
             if loss_train_ema is None:
                 loss_train_ema = loss.item()
@@ -95,7 +95,8 @@ def train(
             loss.backward()
             optim.step()
             lr_scheduler.step()
-            pbar.set_description(f"lr:{lr_scheduler.get_last_lr()}, loss: {loss_train_ema:.6f}")
+            pbar.set_description(
+                f"lr:{lr_scheduler.get_last_lr()}, loss: {loss_train_ema:.6f}")
             step = (epoch-1) * iter + i
             writer.add_scalars("loss by steps", {
                                "train": loss_train_ema}, step)
@@ -153,13 +154,11 @@ def train(
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        filename="./runs/Fusion_Simple_01.log", level=logging.INFO)
-    writer = SummaryWriter("./runs/Fusion_Simple_01")
+    writer = SummaryWriter("./runs/Fusion_ResMask_02")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_name = torch.cuda.get_device_name(0)
-    model_path = "./checkpoints/Fusion_Simple_01.pth"
-    best_model_path = "./checkpoints/Fusion_Simple_01_Best.pth"
+    model_path = "./checkpoints/Fusion_ResMask_02.pth"
+    best_model_path = "./checkpoints/Fusion_ResMask_02_Best.pth"
     pretrained_path = "./checkpoints/vitpose_base_coco_aic_mpii.pth"
     dataset_root_dir = "/home/junfeng/datasets/PoseTrack21"
 
@@ -183,16 +182,22 @@ if __name__ == "__main__":
     )
 
     encoder = FusionVit(pretrained_path=pretrained_path)
+    # encoder = ResNet50()
+
     neck = nn.Identity()
-    # head = ResMaskHead(pretrained_path=pretrained_path)
+    # neck = nn.Conv2d(1024, 768, 1)
+
+    # head = MaskHead(pretrained_path=pretrained_path)
+    head = ResMaskHead(pretrained_path=pretrained_path)
     # head = DeconvHead(pretrained_path=pretrained_path)
     # head = MaskHead2(pretrained_path=pretrained_path)
-    head = SimpleHead()
+    # head = DeconvHead(pretrained_path=pretrained_path)
+
     model = PoseEstimate(encoder=encoder, neck=neck, head=head)
     model.to(device)
 
-    total_epochs = 10000
-    lr = 1e-5
+    total_epochs = 1500
+    lr = 5e-4
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = JointsMSELoss(use_target_weight=True, device=device)
     print(f"Start training on {device_name}")

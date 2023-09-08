@@ -43,10 +43,10 @@ class PoseEstimate(nn.Module):
         x = self.head.predict(x, n=n)
         return x
     
-    def denoise(self, x, h, t=100):
+    def denoise(self, x, h, n=1, t=100):
         x = self.encoder(x)
         x = self.neck(x)
-        x = self.head.denoise(x, h, t=t)
+        x = self.head.denoise(x, h, n=n, t=t)
         return x
 
 

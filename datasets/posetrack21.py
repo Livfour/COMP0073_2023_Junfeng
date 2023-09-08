@@ -408,7 +408,7 @@ class PoseTrack21(Dataset):
         count = 0
         video_transformed_list = []
         heatmaps_list = []
-        for _, video_transformed, _, _, heatmaps, _, _ in self.get_for_eval():
+        for _, video_transformed, _, _, _, heatmaps, _, _ in self.get_for_eval():
             video_transformed_list.append(video_transformed)
             heatmaps_list.append(heatmaps)
             count += 1

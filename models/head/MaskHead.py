@@ -118,7 +118,9 @@ class MaskHead(BaseHead):
                            device=f.device).repeat(B, 1)
         return torch.mean(self.forward(f, h, _ts), dim=0, keepdim=True)
 
-    def denoise(self, f, heatmaps):
-        B = f.shape[0]
-        _ts = torch.tensor(1, device=f.device).repeat(B, 1)
-        return self.forward(f, heatmaps, _ts)
+    def denoise(self, f, heatmaps, n=1, t=100):
+        B = n
+        f = f.repeat(B, 1, 1, 1)
+        heatmaps = heatmaps.repeat(B, 1, 1, 1)
+        _ts = torch.tensor(t, device=f.device).repeat(B, 1)
+        return torch.mean(self.forward(f, heatmaps, _ts), dim=0, keepdim=True)
