@@ -484,6 +484,92 @@ class PoseTrack21(Dataset):
         )
 
         return video, video_transformed, keypoints, keypoints_transformed, heatmaps
+    
+    def get_multi_person(self, index: int):
+        ann_file = os.path.join(self.anns_dir, self.ann_file_list[index])
+        with HiddenPrints():
+            coco_anns = COCO(os.path.join(self.anns_dir, ann_file))
+        image_ids = coco_anns.getImgIds()
+        images_infos = coco_anns.loadImgs(image_ids)
+        labled_image_ids = []
+        for image_info in images_infos:
+            if image_info['is_labeled']:
+                labled_image_ids.append(int(image_info['id']))
+
+        index = np.random.choice(len(labled_image_ids))
+        image_id = labled_image_ids[index]
+        if index == 0:
+            prev_frame_id = image_id
+            key_frame_id = image_id
+            next_frame_id = labled_image_ids[index+1]
+        elif index == len(labled_image_ids) - 1:
+            prev_frame_id = labled_image_ids[index-1]
+            key_frame_id = image_id
+            next_frame_id = image_id
+        else:
+            prev_frame_id = labled_image_ids[index-1]
+            key_frame_id = image_id
+            next_frame_id = labled_image_ids[index+1]
+        prev_frame_anns = coco_anns.loadAnns(
+            coco_anns.getAnnIds(imgIds=prev_frame_id))
+        key_frame_anns = coco_anns.loadAnns(
+            coco_anns.getAnnIds(imgIds=key_frame_id))
+        next_frame_anns = coco_anns.loadAnns(
+            coco_anns.getAnnIds(imgIds=next_frame_id))
+        key_frame_ann = np.random.choice(key_frame_anns)
+
+        prev_frame_path = os.path.join(
+            self.root_dir, coco_anns.loadImgs(prev_frame_id)[0]['file_name'])
+        key_frame_path = os.path.join(
+            self.root_dir, coco_anns.loadImgs(key_frame_id)[0]['file_name'])
+        next_frame_path = os.path.join(
+            self.root_dir, coco_anns.loadImgs(next_frame_id)[0]['file_name'])
+
+        prev_frame = cv2.cvtColor(cv2.imread(
+            prev_frame_path), cv2.COLOR_BGR2RGB)
+        key_frame = cv2.cvtColor(cv2.imread(
+            key_frame_path), cv2.COLOR_BGR2RGB)
+        next_frame = cv2.cvtColor(cv2.imread(
+            next_frame_path), cv2.COLOR_BGR2RGB)
+        
+        video_list = []
+        video_transformed_list = []
+        expanded_bbox_list = []
+        keypoints_list = []
+        keypoints_transformed_list = []
+        heatmaps_list = []
+
+        for key_frame_ann in key_frame_anns:
+    
+            bbox = key_frame_ann['bbox']
+            keypoints = key_frame_ann['keypoints']
+            track_id = key_frame_ann["track_id"]
+            prev_frame_ann = self._search_track_id(
+                prev_frame_anns, track_id)
+            next_frame_ann = self._search_track_id(
+                next_frame_anns, track_id)
+            if prev_frame_ann is None:
+                prev_frame_ann = key_frame_ann
+            if next_frame_ann is None:
+                next_frame_ann = key_frame_ann
+
+
+
+            video, video_transformed, expanded_bbox, keypoints, keypoints_transformed, heatmaps = self._prepare_targets(
+                key_frame=key_frame,
+                prev_frame=prev_frame,
+                next_frame=next_frame,
+                bbox=bbox,
+                keypoints=keypoints,
+            )
+            video_list.append(video)
+            video_transformed_list.append(video_transformed)
+            expanded_bbox_list.append(expanded_bbox)
+            keypoints_list.append(keypoints)
+            keypoints_transformed_list.append(keypoints_transformed)
+            heatmaps_list.append(heatmaps)
+        
+        return key_frame, video_list, video_transformed_list, expanded_bbox_list, keypoints_list, keypoints_transformed_list, heatmaps_list
 
     def _prepare_targets(self, key_frame, prev_frame, next_frame, bbox, keypoints):
         # crop image according to bounding box

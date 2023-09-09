@@ -83,7 +83,7 @@ def train(
             optim.zero_grad()
             videos = videos.to(device)
             heatmaps = heatmaps.to(device)
-            pred = model(videos[:, 1])
+            pred = model(videos)
             loss = criterion(pred, heatmaps)
             if loss_train_ema is None:
                 loss_train_ema = loss.item()
@@ -119,7 +119,7 @@ def train(
             mask = keypoints_to_mask(keypoints)
             video_transformed = video_transformed.to(device).unsqueeze(0)
             with torch.no_grad():
-                pred_heatmaps = model.predict(video_transformed[:, 1])
+                pred_heatmaps = model.predict(video_transformed)
                 heatmaps = heatmaps.to(device).unsqueeze(0)
                 loss_val += criterion(pred_heatmaps, heatmaps).item()
                 pred_heatmaps = pred_heatmaps.cpu().numpy()
@@ -151,11 +151,11 @@ def train(
 
 
 if __name__ == "__main__":
-    writer = SummaryWriter("./runs/Single_Frame_ViT_Deconv_01")
+    writer = SummaryWriter("./runs/Multi_Frame_ViT_Deconv_01")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_name = torch.cuda.get_device_name(0)
-    model_path = "./checkpoints/Single_Frame_ViT_Deconv_01.pth"
-    best_model_path = "./checkpoints/Single_Frame_ViT_Deconv_01_Best.pth"
+    model_path = "./checkpoints/Multi_Frame_ViT_Deconv_01.pth"
+    best_model_path = "./checkpoints/Multi_Frame_ViT_Deconv_01_Best.pth"
     pretrained_path = "./checkpoints/vitpose_base_coco_aic_mpii.pth"
     dataset_root_dir = "/home/junfeng/datasets/PoseTrack21"
 
@@ -171,21 +171,21 @@ if __name__ == "__main__":
 
     dataloader_train = DataLoader(
         dataset_train,
-        batch_size=128,
+        batch_size=32,
         shuffle=True,
         drop_last=True,
         num_workers=16,
         collate_fn=dataset_train.collate_fn,
     )
 
-    encoder = ViTEncoder(pretrained_path=pretrained_path)
-    neck = UnPatch()
+    encoder = VideoViTEncoder(pretrained_path=pretrained_path)
+    neck = nn.Identity()
     head = DeconvHead(pretrained_path=pretrained_path)
 
     model = PoseEstimate(encoder=encoder, neck=neck, head=head)
     model.to(device)
 
-    total_epochs = 1500
+    total_epochs = 2000
     lr = 5e-4
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = JointsMSELoss(use_target_weight=True, device=device)

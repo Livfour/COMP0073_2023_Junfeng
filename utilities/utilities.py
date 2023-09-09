@@ -21,6 +21,132 @@ class HiddenPrints:
         sys.stdout = self._original_stdout
 
 
+keypoint_info = [
+    dict(name='nose', id=0, color=[51, 153, 255], type='upper', swap=''),
+    dict(
+        name='head_bottom',
+        id=1,
+        color=[51, 153, 255],
+        type='upper',
+        swap=''),
+    dict(
+        name='head_top', id=2, color=[51, 153, 255], type='upper',
+        swap=''),
+    dict(
+        name='left_ear',
+        id=3,
+        color=[51, 153, 255],
+        type='upper',
+        swap='right_ear'),
+    dict(
+        name='right_ear',
+        id=4,
+        color=[51, 153, 255],
+        type='upper',
+        swap='left_ear'),
+    dict(
+        name='left_shoulder',
+        id=5,
+        color=[0, 255, 0],
+        type='upper',
+        swap='right_shoulder'),
+    dict(
+        name='right_shoulder',
+        id=6,
+        color=[255, 128, 0],
+        type='upper',
+        swap='left_shoulder'),
+    dict(
+        name='left_elbow',
+        id=7,
+        color=[0, 255, 0],
+        type='upper',
+        swap='right_elbow'),
+    dict(
+        name='right_elbow',
+        id=8,
+        color=[255, 128, 0],
+        type='upper',
+        swap='left_elbow'),
+    dict(
+        name='left_wrist',
+        id=9,
+        color=[0, 255, 0],
+        type='upper',
+        swap='right_wrist'),
+    dict(
+        name='right_wrist',
+        id=10,
+        color=[255, 128, 0],
+        type='upper',
+        swap='left_wrist'),
+    dict(
+        name='left_hip',
+        id=11,
+        color=[0, 255, 0],
+        type='lower',
+        swap='right_hip'),
+    dict(
+        name='right_hip',
+        id=12,
+        color=[255, 128, 0],
+        type='lower',
+        swap='left_hip'),
+    dict(
+        name='left_knee',
+        id=13,
+        color=[0, 255, 0],
+        type='lower',
+        swap='right_knee'),
+    dict(
+        name='right_knee',
+        id=14,
+        color=[255, 128, 0],
+        type='lower',
+        swap='left_knee'),
+    dict(
+        name='left_ankle',
+        id=15,
+        color=[0, 255, 0],
+        type='lower',
+        swap='right_ankle'),
+    dict(
+        name='right_ankle',
+        id=16,
+        color=[255, 128, 0],
+        type='lower',
+        swap='left_ankle')
+]
+
+skeleton_info = [
+    dict(link=('left_ankle', 'left_knee'), id=0, color=[0, 255, 0]),
+    dict(link=('left_knee', 'left_hip'), id=1, color=[0, 255, 0]),
+    dict(link=('right_ankle', 'right_knee'), id=2, color=[255, 128, 0]),
+    dict(link=('right_knee', 'right_hip'), id=3, color=[255, 128, 0]),
+    dict(link=('left_hip', 'right_hip'), id=4, color=[51, 153, 255]),
+    dict(link=('left_shoulder', 'left_hip'), id=5, color=[51, 153, 255]),
+    dict(link=('right_shoulder', 'right_hip'), id=6, color=[51, 153, 255]),
+    dict(
+        link=('left_shoulder', 'right_shoulder'),
+        id=7,
+        color=[51, 153, 255]),
+    dict(link=('left_shoulder', 'left_elbow'), id=8, color=[0, 255, 0]),
+    dict(
+        link=('right_shoulder', 'right_elbow'), id=9, color=[255, 128, 0]),
+    dict(link=('left_elbow', 'left_wrist'), id=10, color=[0, 255, 0]),
+    dict(link=('right_elbow', 'right_wrist'), id=11, color=[255, 128, 0]),
+    dict(link=('nose', 'head_bottom'), id=12, color=[51, 153, 255]),
+    dict(link=('nose', 'head_top'), id=13, color=[51, 153, 255]),
+    dict(
+        link=('head_bottom', 'left_shoulder'), id=14, color=[51, 153,
+                                                             255]),
+    dict(
+        link=('head_bottom', 'right_shoulder'),
+        id=15,
+        color=[51, 153, 255])
+]
+
+
 keypoints_dict = {
     0: "nose",
     1: "left_eye",
@@ -130,77 +256,6 @@ def show_image(image,
     plt.show()
 
 
-def show_image2(image,
-                keypoints=None,
-                keypoints_visibilities=None,
-                heatmaps=None,
-                bbox=None,
-                showlabel=False,
-                keypoints_labels=[
-                    "nose",
-                    "left_eye",
-                    "right_eye",
-                    "left_ear",
-                    "right_ear",
-                    "left_shoulder",
-                    "right_shoulder",
-                    "left_elbow",
-                    "right_elbow",
-                    "left_wrist",
-                    "right_wrist",
-                    "left_hip",
-                    "right_hip",
-                    "left_knee",
-                    "right_knee",
-                    "left_ankle",
-                    "right_ankle"
-                ],
-                skeletons=[
-                    (0, 1),
-                    (0, 2),
-                    (0, 5),
-                    (0, 6),
-                    (1, 3),
-                    (2, 4),
-                    (5, 6),
-                    (5, 7),
-                    (5, 11),
-                    (6, 8),
-                    (6, 12),
-                    (7, 9),
-                    (8, 10),
-                    (11, 12),
-                    (11, 13),
-                    (13, 15),
-                    (12, 14),
-                    (14, 16)]
-                ):
-    fig, ax = plt.subplots(1)
-    fig.set_size_inches(8, 8)
-    if isinstance(image, torch.Tensor):
-        image = image.permute(1, 2, 0).numpy()
-    plt.imshow(image)
-    H, W, C = image.shape
-    for i, v in enumerate(keypoints_visibilities):
-        if v:
-            x, y = keypoints[i]
-            point = patches.Circle((x, y), radius=2, color='red')
-            ax.add_patch(point)
-            if showlabel:
-                ax.text(x, y, keypoints_labels[i])
-    for skeleton in skeletons:
-        if keypoints_visibilities[skeleton[0]] and keypoints_visibilities[skeleton[1]]:
-            x1, y1 = keypoints[skeleton[0]]
-            x2, y2 = keypoints[skeleton[1]]
-            ax.plot([x1, x2], [y1, y2], linewidth=2, color='c')
-    if bbox is not None:
-        x, y, w, h = bbox
-        rect = patches.Rectangle((x, y), w, h,
-                                 linewidth=2, edgecolor='r', facecolor='none')
-        ax.add_patch(rect)
-    plt.show()
-
-
 def show_heatmaps(heatmaps):
     if not isinstance(heatmaps, torch.Tensor):
         heatmaps = torch.tensor(heatmaps)
@@ -211,18 +266,6 @@ def show_heatmaps(heatmaps):
         ax.imshow(heatmap.squeeze(), cmap="hot")
         ax.axis("off")
     plt.show()
-
-
-def get_scores(heatmaps):
-    scores = []
-    for heatmap in heatmaps:
-        if torch.max(heatmap) > 0.2:
-            scores.append(torch.max(heatmap))
-        else:
-            scores.append(torch.tensor(0, dtype=torch.float32))
-    if len(scores) == 0:
-        return torch.tensor(0, dtype=torch.float32)
-    return torch.mean(torch.tensor(scores))
 
 
 def heatmaps_to_keypoints(heatmaps, image_size, threshold=0.2):
@@ -377,6 +420,16 @@ def keypoints_to_visible(keypoints):
             visible[i] = 1
     return visible
 
+def get_pred_heatmap_mask(pred_heatmaps, threshold=0.2):
+    """
+    pred_heatmaps: (17, 64, 48)
+    """
+    mask = np.zeros((1, 17)).astype(bool)
+    for i in range(17):
+        if np.max(pred_heatmaps[i]) > threshold:
+            mask[0, i] = True
+    return mask
+
 
 def normalize_heatmaps(heatmaps):
     """
@@ -397,18 +450,22 @@ def normalize_heatmaps(heatmaps):
         max_val = torch.max(heatmaps[i])
 
         if max_val != min_val:
-            normalized_heatmaps[i] = (heatmaps[i] - min_val) / (max_val - min_val)
+            normalized_heatmaps[i] = (
+                heatmaps[i] - min_val) / (max_val - min_val)
 
     return normalized_heatmaps
 
+
 def ReLu(x):
     return np.maximum(x, 0)
+
 
 def count_positive(x):
     if x < 0:
         return 0
     else:
         return 1
-    
+
+
 def get_mean_average_acc(TP, P):
     return sum(TP) / sum(P)
