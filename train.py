@@ -8,16 +8,13 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
 
 from datasets.posetrack21 import PoseTrack21
-from models.PoseEstimate import PoseEstimate
-from models.backbone import ResNet50
-from models.backbone.vit import ViTEncoder
-from models.backbone.video_vit import VideoViTEncoder
-from models.backbone.vit_with_fusion import FusionVit
-from models.head.LMSFI import LMSFI
-from models.head import DeconvHead, MaskHead, ResMaskHead, SimpleHead
-from models.head.ResMaskHeadv2 import ResMaskHead2
-from models.head.MaskHead2 import MaskHead2
 from loss import JointsMSELoss
+
+from models.PoseEstimate import PoseEstimate
+from models.backbone import ResNet50, ViTEncoder, VideoViTEncoder, FusionVit
+from models.neck import UnPatch
+from models.head import DeconvHead, MaskHead, ResMaskHead, SimpleHead
+
 from utilities.utilities import keypoints_to_mask
 from mmpose.evaluation import pose_pck_accuracy
 
@@ -86,7 +83,7 @@ def train(
             optim.zero_grad()
             videos = videos.to(device)
             heatmaps = heatmaps.to(device)
-            pred = model(videos, heatmaps)
+            pred = model(videos[:, 1])
             loss = criterion(pred, heatmaps)
             if loss_train_ema is None:
                 loss_train_ema = loss.item()
@@ -122,7 +119,7 @@ def train(
             mask = keypoints_to_mask(keypoints)
             video_transformed = video_transformed.to(device).unsqueeze(0)
             with torch.no_grad():
-                pred_heatmaps = model.predict(video_transformed)
+                pred_heatmaps = model.predict(video_transformed[:, 1])
                 heatmaps = heatmaps.to(device).unsqueeze(0)
                 loss_val += criterion(pred_heatmaps, heatmaps).item()
                 pred_heatmaps = pred_heatmaps.cpu().numpy()
@@ -154,11 +151,11 @@ def train(
 
 
 if __name__ == "__main__":
-    writer = SummaryWriter("./runs/Fusion_ResMask_02")
+    writer = SummaryWriter("./runs/Single_Frame_ViT_Deconv_01")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_name = torch.cuda.get_device_name(0)
-    model_path = "./checkpoints/Fusion_ResMask_02.pth"
-    best_model_path = "./checkpoints/Fusion_ResMask_02_Best.pth"
+    model_path = "./checkpoints/Single_Frame_ViT_Deconv_01.pth"
+    best_model_path = "./checkpoints/Single_Frame_ViT_Deconv_01_Best.pth"
     pretrained_path = "./checkpoints/vitpose_base_coco_aic_mpii.pth"
     dataset_root_dir = "/home/junfeng/datasets/PoseTrack21"
 
@@ -174,24 +171,16 @@ if __name__ == "__main__":
 
     dataloader_train = DataLoader(
         dataset_train,
-        batch_size=64,
+        batch_size=128,
         shuffle=True,
         drop_last=True,
         num_workers=16,
         collate_fn=dataset_train.collate_fn,
     )
 
-    encoder = FusionVit(pretrained_path=pretrained_path)
-    # encoder = ResNet50()
-
-    neck = nn.Identity()
-    # neck = nn.Conv2d(1024, 768, 1)
-
-    # head = MaskHead(pretrained_path=pretrained_path)
-    head = ResMaskHead(pretrained_path=pretrained_path)
-    # head = DeconvHead(pretrained_path=pretrained_path)
-    # head = MaskHead2(pretrained_path=pretrained_path)
-    # head = DeconvHead(pretrained_path=pretrained_path)
+    encoder = ViTEncoder(pretrained_path=pretrained_path)
+    neck = UnPatch()
+    head = DeconvHead(pretrained_path=pretrained_path)
 
     model = PoseEstimate(encoder=encoder, neck=neck, head=head)
     model.to(device)
