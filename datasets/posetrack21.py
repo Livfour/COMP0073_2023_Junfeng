@@ -284,29 +284,7 @@ class PoseTrack21(Dataset):
                 )
             case "test":
                 self.anns_dir = os.path.join(
-                    self.root_dir, "posetrack_data", "test")
-                self.transform = A.Compose([
-                    A.Resize(
-                        height=self.img_H,
-                        width=self.img_W,
-                        interpolation=cv2.INTER_CUBIC,
-                    ),
-                    A.Normalize(
-                        mean=[0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225],
-                    ),
-                    ToTensorV2(),
-                ],
-                    keypoint_params=A.KeypointParams(
-                    format="xy",
-                    label_fields=['class_labels'],
-                ),
-                    additional_targets={
-                        "prev_frame": "image", "next_frame": "image"},
-                )
-            case "train_val":
-                self.anns_dir = os.path.join(
-                    self.root_dir, "posetrack_data", "train_val")
+                    self.root_dir, "posetrack_data", "val")
                 self.transform = A.Compose([
                     A.Resize(
                         height=self.img_H,
@@ -403,18 +381,6 @@ class PoseTrack21(Dataset):
                 )
 
                 yield video, video_transformed, torch.tensor(expanded_bbox), keypoints, keypoints_transformed, heatmaps, image_id, track_id
-
-    def get_for_train(self, size: int):
-        count = 0
-        video_transformed_list = []
-        heatmaps_list = []
-        for _, video_transformed, _, _, _, heatmaps, _, _ in self.get_for_eval():
-            video_transformed_list.append(video_transformed)
-            heatmaps_list.append(heatmaps)
-            count += 1
-            if count == size:
-                yield torch.stack(video_transformed_list), torch.stack(heatmaps_list)
-                count = 0
 
     def __getitem__(self, index: int):
         ann_file = os.path.join(self.anns_dir, self.ann_file_list[index])
@@ -683,14 +649,3 @@ class PoseTrack21(Dataset):
             else:
                 processed_keypoints.append((x, y, original_keypoints[i][2]))
         return processed_keypoints
-
-
-dataset_root_dir = "/home/junfeng/datasets/PoseTrack21"
-dataset_train = PoseTrack21(
-    root_dir=dataset_root_dir,
-    set="train",
-)
-dataset_val = PoseTrack21(
-    root_dir=dataset_root_dir,
-    set="val",
-)
